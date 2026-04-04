@@ -1,0 +1,32 @@
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+coverage/
+**/coverage/
+playwright-report/
+**/playwright-report/
+test-results/
+**/test-results/
+*.log
+.DS_Store
+
+# env and secrets
+.env
+.env.*
+!.env.example
+
+# prisma databases
+server/prisma/*.db
+server/prisma/*.db-journal
+*.sqlite
+*.sqlite3
+
+# uploads
+server/storage/cv/*
+!server/storage/cv/.gitkeep
+
+# vite and electron output
+client/.vite/
+client/dist/
+client/release/
