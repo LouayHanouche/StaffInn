@@ -54,9 +54,11 @@ npm install
 Generate Prisma client, apply schema, and seed realistic data:
 
 ```bash
+
 npm run prisma:generate --workspace server
 npx prisma db push --schema server/prisma/schema.prisma
 npm run prisma:seed --workspace server
+
 ```
 
 ## Run in Development
