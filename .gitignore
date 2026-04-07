@@ -17,14 +17,15 @@ test-results/
 !.env.example
 
 # prisma databases
-server/prisma/*.db
-server/prisma/*.db-journal
+server/prisma/**/*.db
+server/prisma/**/*.db-journal
 *.sqlite
 *.sqlite3
 
 # uploads
 server/storage/cv/*
 !server/storage/cv/.gitkeep
+tests/server/storage/cv/*
 
 # vite and electron output
 client/.vite/

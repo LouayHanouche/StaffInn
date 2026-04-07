@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { DashboardLayout } from '../components/DashboardLayout';
-import { ApiError, api } from '../lib/api';
+import { ApiError, api, apiBaseUrl } from '../lib/api';
 import { Toast } from '../components/Toast';
 
 interface Candidate {
@@ -277,7 +277,7 @@ export const CVDatabase = (): JSX.Element => {
                   </button>
                   {candidate.cvPath && (
                     <a
-                      href={`/api${candidate.cvPath}`}
+                      href={`${apiBaseUrl}/files/cv/${candidate.cvPath}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="btn btn--outline btn--sm"
@@ -355,7 +355,7 @@ export const CVDatabase = (): JSX.Element => {
               </button>
               {viewingCandidate.cvPath && (
                 <a
-                  href={`/api${viewingCandidate.cvPath}`}
+                  href={`${apiBaseUrl}/files/cv/${viewingCandidate.cvPath}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="btn btn--primary"

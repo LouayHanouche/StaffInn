@@ -81,6 +81,13 @@ describe('offers and role-based access', () => {
     expect(offers.status).toBe(200);
     expect(offers.body.items.length).toBeGreaterThan(0);
 
+    const offersByQ = await request(app)
+      .get('/offers?page=1&pageSize=20&q=night&sort=experience_desc')
+      .set('Authorization', `Bearer ${candidateToken}`);
+
+    expect(offersByQ.status).toBe(200);
+    expect(Array.isArray(offersByQ.body.items)).toBe(true);
+
     const apply = await request(app)
       .post(`/offers/${offerId}/apply`)
       .set('Authorization', `Bearer ${candidateToken}`)

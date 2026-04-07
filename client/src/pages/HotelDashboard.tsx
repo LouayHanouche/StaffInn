@@ -374,7 +374,12 @@ export const HotelDashboard = () => {
           <div className="card__header">
             <h2 className="card__title">📋 Liste des Offres</h2>
           </div>
-          {offers.length === 0 ? (
+          {offersQuery.isLoading ? (
+            <div className="loading-state">
+              <div className="loading-spinner" />
+              <p>Chargement des offres...</p>
+            </div>
+          ) : offers.length === 0 ? (
             <div className="empty-state">
               <div className="empty-state__icon">📭</div>
               <p className="empty-state__text">Aucune offre publiée</p>
@@ -388,7 +393,12 @@ export const HotelDashboard = () => {
           <div className="card__header">
             <h2 className="card__title">🔔 Candidatures Récentes</h2>
           </div>
-          {recentApplications.length === 0 ? (
+          {applicationsQuery.isLoading ? (
+            <div className="loading-state">
+              <div className="loading-spinner" />
+              <p>Chargement des candidatures...</p>
+            </div>
+          ) : recentApplications.length === 0 ? (
             <div className="empty-state">
               <div className="empty-state__icon">📭</div>
               <p className="empty-state__text">Aucune candidature reçue</p>

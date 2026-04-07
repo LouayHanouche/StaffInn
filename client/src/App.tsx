@@ -4,6 +4,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { useAuth } from './context/AuthContext';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
+import { LandingPage } from './pages/LandingPage';
 
 const CandidateDashboard = lazy(() =>
   import('./pages/CandidateDashboard').then((module) => ({ default: module.CandidateDashboard }))
@@ -17,6 +18,9 @@ const CandidateApplications = lazy(() =>
 const CandidateRecruitments = lazy(() =>
   import('./pages/CandidateRecruitments').then((module) => ({ default: module.CandidateRecruitments }))
 );
+const CandidateOfferSearch = lazy(() =>
+  import('./pages/CandidateOfferSearch').then((module) => ({ default: module.CandidateOfferSearch }))
+);
 const HotelDashboard = lazy(() =>
   import('./pages/HotelDashboard').then((module) => ({ default: module.HotelDashboard }))
 );
@@ -25,6 +29,9 @@ const CVDatabase = lazy(() =>
 );
 const AdminPanel = lazy(() =>
   import('./pages/AdminPanel').then((module) => ({ default: module.AdminPanel }))
+);
+const AdminReportsPage = lazy(() =>
+  import('./pages/AdminReportsPage').then((module) => ({ default: module.AdminReportsPage }))
 );
 
 const HomeRedirect = () => {
@@ -39,7 +46,7 @@ const HomeRedirect = () => {
   }
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <LandingPage />;
   }
 
   if (user.role === 'CANDIDATE') {
@@ -91,6 +98,14 @@ export const App = (): JSX.Element => {
             }
           />
           <Route
+            path="/candidate/offers"
+            element={
+              <ProtectedRoute allowedRoles={['CANDIDATE']}>
+                <CandidateOfferSearch />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/candidate/recruitments"
             element={
               <ProtectedRoute allowedRoles={['CANDIDATE']}>
@@ -119,6 +134,14 @@ export const App = (): JSX.Element => {
             element={
               <ProtectedRoute allowedRoles={['ADMIN']}>
                 <AdminPanel />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/reports"
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN']}>
+                <AdminReportsPage />
               </ProtectedRoute>
             }
           />

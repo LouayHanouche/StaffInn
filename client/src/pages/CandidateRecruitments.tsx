@@ -30,7 +30,12 @@ export const CandidateRecruitments = (): JSX.Element => {
         <div className="card__header">
           <h2 className="card__title">✅ Offres où vous êtes recruté</h2>
         </div>
-        {recruitments.length === 0 ? (
+        {applicationsQuery.isLoading ? (
+          <div className="loading-state">
+            <div className="loading-spinner" />
+            <p>Chargement des recrutements...</p>
+          </div>
+        ) : recruitments.length === 0 ? (
           <div className="empty-state">
             <div className="empty-state__icon">🎯</div>
             <p className="empty-state__text">Aucun recrutement pour le moment</p>

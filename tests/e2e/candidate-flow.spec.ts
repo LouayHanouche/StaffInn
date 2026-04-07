@@ -71,6 +71,8 @@ test('candidate full flow: register -> profile -> upload CV -> apply', async () 
       page: '1',
       pageSize: '20',
       position: 'Reception',
+      q: 'reception',
+      sort: 'createdAt_desc',
     },
   });
   expect(offers.status()).toBe(200);

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import {
   applicationSchema,
   applicationStatusUpdateSchema,
-  filterQuerySchema,
+  offerSearchQuerySchema,
   offerCreateSchema,
   offerUpdateSchema,
 } from '@staffinn/shared';
@@ -48,13 +48,13 @@ offersRouter.get('/', requireAuth, async (request, response) => {
     return;
   }
 
-  const parsed = filterQuerySchema.safeParse(request.query);
+  const parsed = offerSearchQuerySchema.safeParse(request.query);
   if (!parsed.success) {
     response.status(400).json({ message: 'Invalid filters', errors: parsed.error.flatten() });
     return;
   }
 
-  const { page, pageSize, skills, experience_min: experienceMin, position } = parsed.data;
+  const { page, pageSize, skills, experience_min: experienceMin, position, q, sort } = parsed.data;
 
   const cacheKey = cacheKeyFrom('candidate-offers', {
     page,
@@ -62,6 +62,8 @@ offersRouter.get('/', requireAuth, async (request, response) => {
     skills,
     experienceMin,
     position,
+    q,
+    sort,
   });
 
   const cached = searchCache.get(cacheKey);
@@ -75,14 +77,35 @@ offersRouter.get('/', requireAuth, async (request, response) => {
     experienceMin,
     position,
   });
+  const whereWithSearch =
+    q && q.trim()
+      ? {
+          AND: [
+            where,
+            {
+              OR: [
+                { title: { contains: q.trim() } },
+                { description: { contains: q.trim() } },
+              ],
+            },
+          ],
+        }
+      : where;
+
+  const orderBy =
+    sort === 'experience_asc'
+      ? { requiredExperience: 'asc' as const }
+      : sort === 'experience_desc'
+        ? { requiredExperience: 'desc' as const }
+        : { createdAt: 'desc' as const };
 
   const [total, items] = await Promise.all([
-    prisma.jobOffer.count({ where }),
+    prisma.jobOffer.count({ where: whereWithSearch }),
     prisma.jobOffer.findMany({
-      where,
+      where: whereWithSearch,
       skip: (page - 1) * pageSize,
       take: pageSize,
-      orderBy: { createdAt: 'desc' },
+      orderBy,
       include: {
         hotel: {
           select: {

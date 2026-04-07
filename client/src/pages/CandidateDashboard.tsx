@@ -72,6 +72,13 @@ export const CandidateDashboard = (): JSX.Element => {
 
   return (
     <DashboardLayout title="Tableau de Bord Candidat">
+      {applicationsQuery.isLoading || offersQuery.isLoading ? (
+        <div className="loading-state">
+          <div className="loading-spinner" />
+          <p>Chargement du tableau de bord...</p>
+        </div>
+      ) : (
+        <>
       {/* Vue d'ensemble */}
       <div className="card">
         <div className="card__header">
@@ -246,6 +253,8 @@ export const CandidateDashboard = (): JSX.Element => {
         </div>
       )}
 
+        </>
+      )}
       <Toast message={toast.message} type={toast.type} />
     </DashboardLayout>
   );

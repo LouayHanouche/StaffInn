@@ -10,6 +10,7 @@ export const Sidebar = (): JSX.Element => {
   const candidateLinks = [
     { path: '/candidate/profile', icon: '👤', label: 'Mon Profil' },
     { path: '/candidate', icon: '🏠', label: "Vue d'ensemble" },
+    { path: '/candidate/offers', icon: '🔍', label: 'Offres' },
     { path: '/candidate/applications', icon: '📋', label: 'Candidatures' },
     { path: '/candidate/recruitments', icon: '✅', label: 'Recruté' },
   ];
@@ -19,7 +20,10 @@ export const Sidebar = (): JSX.Element => {
     { path: '/cv-database', icon: '👥', label: 'Candidats' },
   ];
 
-  const adminLinks = [{ path: '/admin', icon: '🏠', label: 'Administration' }];
+  const adminLinks = [
+    { path: '/admin', icon: '🏠', label: 'Administration' },
+    { path: '/admin/reports', icon: '📋', label: 'Signalements' },
+  ];
 
   const links =
     user?.role === 'ADMIN' ? adminLinks : user?.role === 'HOTEL' ? hotelLinks : candidateLinks;

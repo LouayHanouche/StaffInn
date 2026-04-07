@@ -31,7 +31,7 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(32),
   ACCESS_TOKEN_TTL: z.string().default('15m'),
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().min(1).max(30).default(7),
-  COOKIE_SECURE: z.coerce.boolean().default(false),
+  COOKIE_SECURE: z.coerce.boolean().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -40,4 +40,7 @@ if (!parsed.success) {
   throw new Error(`Invalid environment configuration: ${parsed.error.message}`);
 }
 
-export const env = parsed.data;
+// COOKIE_SECURE defaults to true in production, false otherwise
+const cookieSecure = parsed.data.COOKIE_SECURE ?? (parsed.data.NODE_ENV === 'production');
+
+export const env = { ...parsed.data, COOKIE_SECURE: cookieSecure };

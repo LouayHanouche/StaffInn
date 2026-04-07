@@ -53,7 +53,12 @@ export const CandidateApplications = (): JSX.Element => {
         <div className="card__header">
           <h2 className="card__title">📋 Mes candidatures</h2>
         </div>
-        {applications.length === 0 ? (
+        {applicationsQuery.isLoading ? (
+          <div className="loading-state">
+            <div className="loading-spinner" />
+            <p>Chargement des candidatures...</p>
+          </div>
+        ) : applications.length === 0 ? (
           <div className="empty-state">
             <div className="empty-state__icon">📭</div>
             <p className="empty-state__text">Aucune candidature</p>

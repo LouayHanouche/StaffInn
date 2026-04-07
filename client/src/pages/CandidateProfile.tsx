@@ -1,6 +1,6 @@
 import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ApiError, api, uploadCv } from '../lib/api';
+import { ApiError, api, apiBaseUrl, uploadCv } from '../lib/api';
 import { Toast } from '../components/Toast';
 import { DashboardLayout } from '../components/DashboardLayout';
 
@@ -96,7 +96,7 @@ export const CandidateProfile = (): JSX.Element => {
                 <div className="cv-status cv-status--uploaded">
                   <span>✅ CV téléchargé</span>
                   <a
-                    href={`/api${profile.cvPath}`}
+                    href={`${apiBaseUrl}/files/cv/${profile.cvPath}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="btn btn--ghost btn--sm"

@@ -73,17 +73,18 @@ model Candidate {
 }
 
 model JobOffer {
-  id                 String         @id @default(cuid())
-  hotelId            String
-  title              String
-  description        String
-  requiredSkills     String
-  requiredExperience Int
-  status             String         @default("PENDING")
-  createdAt          DateTime       @default(now())
-  updatedAt          DateTime       @updatedAt
-  hotel              Hotel          @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  applications       Application[]
+  id                   String               @id @default(cuid())
+  hotelId              String
+  title                String
+  description          String
+  requiredSkills       String
+  requiredExperience   Int
+  status               String               @default("PENDING")
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  hotel                Hotel                @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  applications         Application[]
+  moderationDecisions  ModerationDecision[]
 
   @@index([status])
   @@index([title])
@@ -105,4 +106,37 @@ model Application {
   @@unique([candidateId, jobOfferId])
   @@index([status])
   @@map("applications")
+}
+
+model ModerationDecision {
+  id          String   @id @default(cuid())
+  offerId     String
+  action      String
+  reason      String?
+  adminId     String
+  createdAt   DateTime @default(now())
+  jobOffer    JobOffer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+
+  @@index([offerId])
+  @@index([adminId])
+  @@map("moderation_decisions")
+}
+
+model Report {
+  id          String    @id @default(cuid())
+  reporterId  String
+  targetType  String
+  targetId    String
+  reason      String
+  status      String    @default("PENDING")
+  resolution  String?
+  resolvedBy  String?
+  resolvedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status])
+  @@index([targetType, targetId])
+  @@index([reporterId])
+  @@map("reports")
 }

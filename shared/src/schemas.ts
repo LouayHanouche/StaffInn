@@ -87,6 +87,11 @@ export const filterQuerySchema = z.object({
   position: z.string().trim().max(120).optional(),
 });
 
+export const offerSearchQuerySchema = filterQuerySchema.extend({
+  q: z.string().trim().max(200).optional(),
+  sort: z.enum(['createdAt_desc', 'experience_asc', 'experience_desc']).optional(),
+});
+
 export const adminUserUpdateSchema = z.object({
   isActive: z.boolean().optional(),
   role: z.enum(['HOTEL', 'CANDIDATE', 'ADMIN']).optional(),
@@ -110,4 +115,71 @@ export const hotelApplicationCreateSchema = z.object({
   candidateId: z.string().trim().min(1),
   offerId: z.string().trim().min(1),
   status: applicationStatusSchema.optional(),
+});
+
+// === Admin Create User Schema ===
+export const adminCreateUserSchema = z
+  .object({
+    role: z.enum(['HOTEL', 'CANDIDATE', 'ADMIN']),
+    email: emailSchema,
+    password: passwordSchema,
+    hotelName: z.string().trim().min(2).max(150).optional(),
+    fullName: z.string().trim().min(2).max(150).optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.role === 'HOTEL' && !value.hotelName) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'hotelName is required for HOTEL role',
+        path: ['hotelName'],
+      });
+    }
+    if (value.role === 'CANDIDATE' && !value.fullName) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'fullName is required for CANDIDATE role',
+        path: ['fullName'],
+      });
+    }
+  });
+
+// === Admin Profile Update Schemas ===
+export const adminCandidateProfileUpdateSchema = z.object({
+  fullName: z.string().trim().min(2).max(150).optional(),
+  skills: skillsSchema.optional(),
+  experienceYears: z.number().int().min(0).max(60).optional(),
+  position: z.string().trim().min(2).max(120).optional(),
+});
+
+export const adminHotelProfileUpdateSchema = z.object({
+  name: z.string().trim().min(2).max(150).optional(),
+  address: z.string().trim().min(2).max(300).optional(),
+  description: safeTextSchema.optional(),
+});
+
+// === Extended Moderation Schema with Reason ===
+export const adminModerationSchemaExtended = z.object({
+  action: z.enum(['approve', 'reject', 'close']),
+  reason: z.string().trim().max(1000).optional(),
+});
+
+// === Report Schemas ===
+export const reportStatusSchema = z.enum(['PENDING', 'REVIEWING', 'RESOLVED', 'DISMISSED']);
+
+export const reportCreateSchema = z.object({
+  targetType: z.enum(['USER', 'OFFER', 'APPLICATION']),
+  targetId: z.string().trim().min(1),
+  reason: z.string().trim().min(10).max(2000),
+});
+
+export const reportUpdateSchema = z.object({
+  status: reportStatusSchema,
+  resolution: z.string().trim().max(2000).optional(),
+});
+
+export const reportQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  status: reportStatusSchema.optional(),
+  targetType: z.enum(['USER', 'OFFER', 'APPLICATION']).optional(),
 });
