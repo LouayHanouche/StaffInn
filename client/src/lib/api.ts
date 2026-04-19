@@ -11,10 +11,12 @@ export const tokenStore = {
 
 export class ApiError extends Error {
   public readonly status: number;
+  public readonly details: unknown;
 
-  public constructor(status: number, message: string) {
+  public constructor(status: number, message: string, details?: unknown) {
     super(message);
     this.status = status;
+    this.details = details;
   }
 }
 
@@ -34,7 +36,16 @@ const request = async <T>(path: string, init: RequestInit = {}): Promise<T> => {
 
   if (!response.ok) {
     const payload = await response.json().catch(() => ({ message: 'Request failed' }));
-    throw new ApiError(response.status, payload.message ?? 'Request failed');
+    const message =
+      typeof payload === 'object' &&
+      payload &&
+      'message' in payload &&
+      typeof payload.message === 'string'
+        ? payload.message
+        : 'Request failed';
+    const details =
+      typeof payload === 'object' && payload && 'errors' in payload ? payload.errors : undefined;
+    throw new ApiError(response.status, message, details);
   }
 
   if (response.status === 204) {
@@ -74,7 +85,16 @@ export const uploadCv = async (file: File): Promise<{ profile: unknown }> => {
 
   if (!response.ok) {
     const payload = await response.json().catch(() => ({ message: 'Upload failed' }));
-    throw new ApiError(response.status, payload.message ?? 'Upload failed');
+    const message =
+      typeof payload === 'object' &&
+      payload &&
+      'message' in payload &&
+      typeof payload.message === 'string'
+        ? payload.message
+        : 'Upload failed';
+    const details =
+      typeof payload === 'object' && payload && 'errors' in payload ? payload.errors : undefined;
+    throw new ApiError(response.status, message, details);
   }
 
   return (await response.json()) as { profile: unknown };

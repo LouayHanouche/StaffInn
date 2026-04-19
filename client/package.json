@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "lint": "eslint \"src/**/*.{ts,tsx}\"",
     "test": "vitest run --passWithNoTests",
-    "desktop:dev": "wait-on tcp:5173 && node scripts/start-desktop.mjs"
+    "desktop:dev": "wait-on tcp:4000 tcp:5173 && node scripts/start-desktop.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "5.56.2",

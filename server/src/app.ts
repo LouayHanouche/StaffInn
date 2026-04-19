@@ -15,6 +15,14 @@ import { offersRouter } from './routes/offers.js';
 
 export const createApp = () => {
   const app = express();
+  const parsedClientOrigin = new URL(env.CLIENT_ORIGIN);
+  const allowedOrigins = new Set<string>([parsedClientOrigin.origin]);
+
+  if (parsedClientOrigin.hostname === 'localhost' || parsedClientOrigin.hostname === '127.0.0.1') {
+    const aliasOrigin = new URL(parsedClientOrigin.origin);
+    aliasOrigin.hostname = parsedClientOrigin.hostname === 'localhost' ? '127.0.0.1' : 'localhost';
+    allowedOrigins.add(aliasOrigin.origin);
+  }
 
   app.use(
     helmet({
@@ -24,7 +32,7 @@ export const createApp = () => {
 
   app.use(
     cors({
-      origin: env.CLIENT_ORIGIN,
+      origin: Array.from(allowedOrigins),
       credentials: true,
     }),
   );

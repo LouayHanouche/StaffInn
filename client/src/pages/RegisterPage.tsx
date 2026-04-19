@@ -1,8 +1,14 @@
 import { FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { ApiError } from '../lib/api';
 import { Toast } from '../components/Toast';
+import {
+  extractRegisterErrors,
+  isApiErrorLike,
+  normalizeRegisterPayload,
+  validateRegisterPayload,
+  type ValidationErrors,
+} from './register-utils';
 
 export const RegisterPage = () => {
   const navigate = useNavigate();
@@ -13,25 +19,45 @@ export const RegisterPage = () => {
   const [hotelName, setHotelName] = useState('');
   const [fullName, setFullName] = useState('');
   const [toast, setToast] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<ValidationErrors>({});
 
   const onSubmit = async (event: FormEvent): Promise<void> => {
     event.preventDefault();
     setToast(null);
+    setFieldErrors({});
+
+    const payload = normalizeRegisterPayload({
+      role,
+      email,
+      password,
+      hotelName,
+      fullName,
+    });
+
+    const clientErrors = validateRegisterPayload(payload);
+    if (Object.keys(clientErrors).length > 0) {
+      setFieldErrors(clientErrors);
+      setToast('Veuillez corriger les champs invalides.');
+      return;
+    }
+
+    setIsSubmitting(true);
     try {
-      await register({
-        role,
-        email,
-        password,
-        hotelName: role === 'HOTEL' ? hotelName : undefined,
-        fullName: role === 'CANDIDATE' ? fullName : undefined,
-      });
+      await register(payload);
       navigate('/');
     } catch (error) {
-      if (error instanceof ApiError) {
+      if (isApiErrorLike(error)) {
+        const serverErrors = extractRegisterErrors(error.details);
+        if (Object.keys(serverErrors).length > 0) {
+          setFieldErrors(serverErrors);
+        }
         setToast(error.message);
         return;
       }
-      setToast('Échec de l\'inscription, veuillez réessayer.');
+      setToast('Impossible de contacter le serveur. Vérifiez la connexion et réessayez.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -43,7 +69,7 @@ export const RegisterPage = () => {
         </div>
         <p className="login-tagline">Rejoignez la plateforme</p>
       </aside>
-      
+
       <div className="login-form-container">
         <div className="login-form-header">
           <img src="/logo.svg" alt="StaffInn" className="login-form-logo" />
@@ -52,7 +78,6 @@ export const RegisterPage = () => {
         </div>
 
         <form className="login-form" onSubmit={onSubmit}>
-          
           <div className="role-toggle" style={{ marginTop: 0, marginBottom: 24 }}>
             <button
               type="button"
@@ -69,7 +94,7 @@ export const RegisterPage = () => {
               Recruteur
             </button>
           </div>
-          
+
           {role === 'CANDIDATE' && (
             <div className="form-group">
               <label className="form-label">Nom complet</label>
@@ -77,13 +102,21 @@ export const RegisterPage = () => {
                 type="text"
                 className="form-input"
                 value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
+                onChange={(e) => {
+                  setFullName(e.target.value);
+                  setFieldErrors((previous) => ({ ...previous, fullName: undefined }));
+                }}
                 placeholder="Jean Dupont"
                 required
+                minLength={2}
+                maxLength={150}
               />
+              {fieldErrors.fullName ? (
+                <small className="form-help form-help--error">{fieldErrors.fullName}</small>
+              ) : null}
             </div>
           )}
-          
+
           {role === 'HOTEL' && (
             <div className="form-group">
               <label className="form-label">Nom de l'hôtel</label>
@@ -91,42 +124,64 @@ export const RegisterPage = () => {
                 type="text"
                 className="form-input"
                 value={hotelName}
-                onChange={(e) => setHotelName(e.target.value)}
+                onChange={(e) => {
+                  setHotelName(e.target.value);
+                  setFieldErrors((previous) => ({ ...previous, hotelName: undefined }));
+                }}
                 placeholder="Hôtel Le Magnifique"
                 required
+                minLength={2}
+                maxLength={150}
               />
+              {fieldErrors.hotelName ? (
+                <small className="form-help form-help--error">{fieldErrors.hotelName}</small>
+              ) : null}
             </div>
           )}
-          
+
           <div className="form-group">
             <label className="form-label">Adresse Email</label>
             <input
               type="email"
               className="form-input"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setFieldErrors((previous) => ({ ...previous, email: undefined }));
+              }}
               placeholder="votre@email.com"
               required
+              maxLength={255}
             />
+            {fieldErrors.email ? (
+              <small className="form-help form-help--error">{fieldErrors.email}</small>
+            ) : null}
           </div>
-          
+
           <div className="form-group">
             <label className="form-label">Mot de Passe</label>
             <input
               type="password"
               className="form-input"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Minimum 10 caractères"
+              onChange={(e) => {
+                setPassword(e.target.value);
+                setFieldErrors((previous) => ({ ...previous, password: undefined }));
+              }}
+              placeholder="10+ caractères, Maj/Min/Chiffre"
               required
               minLength={10}
+              maxLength={128}
             />
+            {fieldErrors.password ? (
+              <small className="form-help form-help--error">{fieldErrors.password}</small>
+            ) : null}
           </div>
-          
-          <button type="submit" className="btn btn--secondary">
-            S'inscrire
+
+          <button type="submit" className="btn btn--secondary" disabled={isSubmitting}>
+            {isSubmitting ? 'Inscription...' : "S'inscrire"}
           </button>
-          
+
           <div className="login-links">
             <span className="login-links__text">Déjà inscrit ?</span>
             <Link to="/login" className="login-links__link">
@@ -135,7 +190,7 @@ export const RegisterPage = () => {
           </div>
         </form>
       </div>
-      
+
       <Toast message={toast} type="error" />
     </div>
   );

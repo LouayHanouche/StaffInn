@@ -76,7 +76,8 @@ body {
 /* Landing page */
 .landing {
   min-height: 100vh;
-  background: radial-gradient(1200px 800px at 20% 0%, rgba(139, 92, 246, 0.22), transparent 55%),
+  background:
+    radial-gradient(1200px 800px at 20% 0%, rgba(139, 92, 246, 0.22), transparent 55%),
     radial-gradient(900px 650px at 90% 10%, rgba(59, 130, 246, 0.22), transparent 55%),
     var(--color-bg);
 }
@@ -244,22 +245,42 @@ body {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes routeFade {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .route-transition {
@@ -267,8 +288,13 @@ body {
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
 }
 
 .dashboard-layout {
@@ -759,6 +785,16 @@ body {
   outline: none;
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px var(--color-primary-light);
+}
+
+.form-help {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.form-help--error {
+  color: var(--color-danger);
 }
 
 textarea.form-input {
@@ -1544,7 +1580,6 @@ select.form-input {
   .login-form-container {
     padding: 24px;
   }
-
 }
 
 /* Filter Stats */

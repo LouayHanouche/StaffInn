@@ -36,7 +36,9 @@ const setRefreshCookie = (response: Response, token: string): void => {
 authRouter.post('/register', authRateLimiter, async (request, response) => {
   const parsed = registerSchema.safeParse(request.body);
   if (!parsed.success) {
-    response.status(400).json({ message: 'Invalid register payload', errors: parsed.error.flatten() });
+    response
+      .status(400)
+      .json({ message: 'Invalid register payload', errors: parsed.error.flatten() });
     return;
   }
 
@@ -125,8 +127,13 @@ authRouter.post('/login', authRateLimiter, async (request, response) => {
   }
 
   const user = await prisma.user.findUnique({ where: { email: parsed.data.email.toLowerCase() } });
-  if (!user || !user.isActive) {
+  if (!user) {
     response.status(401).json({ message: 'Invalid credentials' });
+    return;
+  }
+
+  if (!user.isActive) {
+    response.status(403).json({ message: 'Compte suspendu' });
     return;
   }
 
@@ -183,7 +190,10 @@ authRouter.post('/refresh', async (request, response) => {
 
   try {
     const payload = verifyRefreshToken(refreshToken);
-    const session = await prisma.session.findUnique({ where: { id: payload.sessionId }, include: { user: true } });
+    const session = await prisma.session.findUnique({
+      where: { id: payload.sessionId },
+      include: { user: true },
+    });
     if (
       !session ||
       session.userId !== payload.sub ||
@@ -203,7 +213,10 @@ authRouter.post('/refresh', async (request, response) => {
       },
     });
 
-    const nextRefreshToken = signRefreshToken({ userId: session.userId, sessionId: nextSession.id });
+    const nextRefreshToken = signRefreshToken({
+      userId: session.userId,
+      sessionId: nextSession.id,
+    });
     await prisma.$transaction([
       prisma.session.update({ where: { id: session.id }, data: { revokedAt: new Date() } }),
       prisma.session.update({
@@ -277,7 +290,10 @@ authRouter.get('/me', requireAuth, async (request, response) => {
       candidate: user.candidate
         ? {
             ...user.candidate,
-            skills: user.candidate.skills.split(',').map((skill) => skill.trim()).filter(Boolean),
+            skills: user.candidate.skills
+              .split(',')
+              .map((skill) => skill.trim())
+              .filter(Boolean),
           }
         : null,
     },

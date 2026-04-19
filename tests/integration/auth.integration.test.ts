@@ -28,6 +28,60 @@ describe('auth routes', () => {
     expect(response.body.accessToken).toBeTruthy();
   });
 
+  it('accepts CORS preflight from localhost alias origin', async () => {
+    const response = await request(app)
+      .options('/auth/register')
+      .set('Origin', 'http://127.0.0.1:5173')
+      .set('Access-Control-Request-Method', 'POST');
+
+    expect(response.status).toBe(204);
+    expect(response.headers['access-control-allow-origin']).toBe('http://127.0.0.1:5173');
+    expect(response.headers['access-control-allow-credentials']).toBe('true');
+  });
+
+  it('rejects CORS preflight from unrelated origin', async () => {
+    const response = await request(app)
+      .options('/auth/register')
+      .set('Origin', 'http://evil.example')
+      .set('Access-Control-Request-Method', 'POST');
+
+    expect(response.status).toBe(204);
+    expect(response.headers['access-control-allow-origin']).toBeUndefined();
+  });
+
+  it('rejects weak password with validation details', async () => {
+    const response = await request(app).post('/auth/register').send({
+      role: 'CANDIDATE',
+      email: 'weak-password@test.local',
+      password: 'abcdefghij',
+      fullName: 'Weak Password User',
+    });
+
+    expect(response.status).toBe(400);
+    expect(response.body.message).toBe('Invalid register payload');
+    expect(response.body.errors?.fieldErrors?.password).toEqual(
+      expect.arrayContaining([
+        'Password must include at least one uppercase letter',
+        'Password must include at least one number',
+      ]),
+    );
+  });
+
+  it('rejects candidate fullName that becomes too short after trim', async () => {
+    const response = await request(app).post('/auth/register').send({
+      role: 'CANDIDATE',
+      email: 'short-name@test.local',
+      password: 'StrongPass123',
+      fullName: ' A ',
+    });
+
+    expect(response.status).toBe(400);
+    expect(response.body.message).toBe('Invalid register payload');
+    expect(response.body.errors?.fieldErrors?.fullName).toEqual(
+      expect.arrayContaining(['String must contain at least 2 character(s)']),
+    );
+  });
+
   it('login -> me -> refresh -> logout flow', async () => {
     const login = await request(app).post('/auth/login').send({
       email: 'candidate@test.local',
@@ -54,5 +108,20 @@ describe('auth routes', () => {
 
     const logout = await request(app).post('/auth/logout').set('Cookie', refreshCookie);
     expect(logout.status).toBe(204);
+  });
+
+  it('returns Compte suspendu for suspended account login', async () => {
+    await prisma.user.update({
+      where: { email: 'candidate@test.local' },
+      data: { isActive: false },
+    });
+
+    const response = await request(app).post('/auth/login').send({
+      email: 'candidate@test.local',
+      password: 'CandidatePass123',
+    });
+
+    expect(response.status).toBe(403);
+    expect(response.body.message).toBe('Compte suspendu');
   });
 });
