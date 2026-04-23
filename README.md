@@ -154,17 +154,6 @@ After seeding, you can use these accounts:
 - Validation with shared Zod schemas
 - Offer/candidate search with pagination and caching
 
-## Why we built it this way
-
-We wanted to keep the project modular and easier to work on as a team, so we separated:
-
-- the client UI
-- the API/server logic
-- the shared schemas/types
-- the tests
-
-That made it easier to validate data in one place, reuse types, and test the main flows without mixing everything into one app.
-
 ## Security / production notes
 
 This is still a student project, but we still tried to keep some good practices:
