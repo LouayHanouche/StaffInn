@@ -1,37 +1,77 @@
 # StaffInn
 
-StaffInn is a desktop-oriented recruitment platform for the hospitality and tourism domain.
-It uses a client-server architecture with role-based workflows for hotels, candidates, and admins.
+StaffInn is our recruitment platform project for the hospitality and tourism field. The idea is simple: candidates can build a profile and apply to offers, hotels can publish offers and browse candidates, and admins can manage the platform.
 
-## Stack Decision
+This repo is a monorepo with a React/Electron client, an Express API, a Prisma database layer, and a separate test workspace.
 
-- Desktop shell: Electron + React (client)
-- Backend API: Node.js + Express + Prisma
-- Database: SQLite (dev/test), with a clean migration path to PostgreSQL
-- Auth: JWT access token + rotating refresh token in httpOnly cookie
-- Validation: Zod shared schemas
-- Tests: Vitest + Supertest + Playwright (API E2E flows)
+## What we used
 
-## Monorepo Structure
+- **Frontend:** React + Vite
+- **Desktop shell:** Electron
+- **Backend:** Node.js + Express
+- **Database:** Prisma + SQLite
+- **Validation:** Zod
+- **Authentication:** JWT access token + refresh token in httpOnly cookie
+- **Testing:** Vitest, Supertest, Playwright
+
+## Features by role
+
+### Admin
+
+- Manage users (list, update role/status, delete)
+- Create users manually (HOTEL / CANDIDATE / ADMIN)
+- Moderate offers (approve/reject/close)
+- View moderation history for offers
+- Access and manage reports (list, detail, create, update status/resolution)
+- Edit candidate and hotel profile data from admin side
+
+### Hotel (Recruiter)
+
+- Create, update, and delete job offers
+- View all applications for hotel offers
+- Update application status (ex: pending/interview/accepted/rejected)
+- Browse/search candidate profiles with filters (skills, experience, position)
+- Create applications directly for a candidate on a hotel offer
+- Access candidate CV files (when available)
+
+### Candidate
+
+- Create and update profile (name, skills, position, experience)
+- Upload CV (PDF/DOCX)
+- Browse/search job offers with filters and sorting
+- Apply to active offers
+- View own applications and application statuses
+
+## Project structure
 
 ```text
 StaffInn/
-├── client/     # React UI + Electron shell
-├── server/     # Express API + Prisma schema and seed
+├── client/     # React app + Electron desktop shell
+├── server/     # Express API + Prisma schema/seed
 ├── shared/     # Shared schemas and types
-├── tests/      # Unit, integration, security, and e2e suites
+├── tests/      # Unit, integration, security, and e2e tests
 └── .env.example
 ```
 
-## Environment Setup
 
-1. Copy environment template:
+
+# Before you run it
+
+### 1) Install dependencies
+
+```bash
+npm install
+```
+
+### 2) Create your env file
+
+Copy the example file:
 
 ```bash
 cp .env.example .env
 ```
 
-2. Ensure required values exist in `.env`:
+Make sure your `.env` has at least these variables:
 
 - `PORT`
 - `CLIENT_ORIGIN`
@@ -43,113 +83,101 @@ cp .env.example .env
 - `COOKIE_SECURE`
 - `VITE_API_BASE_URL`
 
-## Install
+## Database setup
+
+The easiest way is:
 
 ```bash
-npm install
+npm run db:setup
 ```
 
-## Database
+That command will:
 
-Generate Prisma client, apply schema, and seed realistic data:
+- generate the Prisma client
+- push the schema to the database
+- run the seed script
+
+If you want to do it step by step:
 
 ```bash
-
 npm run prisma:generate --workspace server
 npx prisma db push --schema server/prisma/schema.prisma
 npm run prisma:seed --workspace server
-
 ```
 
-## Run in Development
+## Running the project
 
-Run API + React client:
+### Web mode
+
+This starts the backend and the React client together:
 
 ```bash
 npm run dev
 ```
 
-Run API + React + Electron desktop shell:
+### Desktop mode
+
+This starts the backend, the React client, and the Electron shell:
 
 ```bash
 npm run dev:desktop
 ```
 
-### Linux desktop dependencies (Electron)
+## Linux note for Electron
 
-If Electron fails with `libnspr4.so` or similar shared-library errors, install:
+If Electron fails with something like `libnspr4.so` missing, install these packages:
 
 ```bash
 sudo apt update
 sudo apt install -y libnss3 libnspr4 libasound2 libatk1.0-0 libatk-bridge2.0-0 libcups2 libgbm1 libgtk-3-0
 ```
 
-After installing dependencies, rerun:
+Then run again:
 
 ```bash
 npm run dev:desktop
 ```
 
-### Env loading behavior
+## Seed accounts
 
-The server now loads environment values in this order:
+After seeding, you can use these accounts:
 
-1. current working directory `.env`
-2. `server/.env`
-3. repository root `.env`
-4. repository root `.env.example` (fallback defaults)
+- **Admin:** `admin@staffinn.local` / `AdminPass123`
+- **Hotel:** `hotel1@staffinn.local` / `HotelPass123`
+- **Candidate:** `candidate1@staffinn.local` / `CandidatePass123`
 
-## Build, Lint, and Test
 
-Build all packages:
+### Shared / platform-wide
 
-```bash
-npm run build
-```
+- Authentication with access + refresh token flow
+- Role-based access control on protected routes
+- Validation with shared Zod schemas
+- Offer/candidate search with pagination and caching
 
-Lint all packages:
+## Why we built it this way
 
-```bash
-npm run lint
-```
+We wanted to keep the project modular and easier to work on as a team, so we separated:
 
-Run all tests:
+- the client UI
+- the API/server logic
+- the shared schemas/types
+- the tests
 
-```bash
-npm run test
-```
+That made it easier to validate data in one place, reuse types, and test the main flows without mixing everything into one app.
 
-### Single test commands
+## Security / production notes
 
-Unit or integration file with Vitest:
+This is still a student project, but we still tried to keep some good practices:
 
-```bash
-npm run test:integration --workspace tests -- offers.integration.test.ts
-```
+- passwords are hashed with bcrypt
+- protected routes use role-based access control
+- refresh tokens are stored in cookies
+- uploads are restricted to allowed file types
+- input validation is handled with Zod
 
-Playwright single spec:
+If this ever became a real production project, the main next steps would be:
 
-```bash
-npm run test:e2e --workspace tests -- e2e/candidate-flow.spec.ts
-```
-
-## Default Seed Accounts
-
-- Admin: `admin@staffinn.local` / `AdminPass123`
-- Hotel: `hotel1@staffinn.local` / `HotelPass123`
-- Candidate: `candidate1@staffinn.local` / `CandidatePass123`
-
-## Security Highlights
-
-- bcrypt password hashing with 12 rounds
-- Access token (15 min) + refresh token rotation (7 days)
-- RBAC middleware on protected routes
-- Auth route rate limiting (10 req/min)
-- Multer file hardening (PDF/DOCX only, max 5MB, traversal checks)
-- Helmet + CORS restrictions + compression
-
-## Production Notes
-
-- For real multi-user deployment, switch `DATABASE_URL` to PostgreSQL.
-- Keep CV files in protected storage outside public web roots.
-- Rotate secrets and review dependency vulnerabilities regularly.
+- move from SQLite to PostgreSQL
+- review deployment secrets properly
+- improve logging and monitoring
+- harden the upload/storage side more
