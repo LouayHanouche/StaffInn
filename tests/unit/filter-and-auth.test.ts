@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { candidateWhereFromFilters, offerWhereFromFilters } from '../../server/src/services/filter.js';
+import {
+  candidateWhereFromFilters,
+  offerWhereFromFilters,
+} from '../../server/src/services/filter.js';
 import {
   hashRefreshToken,
   signAccessToken,
@@ -23,7 +26,7 @@ describe('filter builders', () => {
     const where = offerWhereFromFilters({
       skills: ['cooking'],
       experienceMin: 1,
-      position: 'Chef',
+      title: 'Chef',
     });
 
     expect(where.AND).toHaveLength(4);

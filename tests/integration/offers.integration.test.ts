@@ -75,7 +75,7 @@ describe('offers and role-based access', () => {
 
   it('candidate can browse and apply to active offer', async () => {
     const offers = await request(app)
-      .get('/offers?page=1&pageSize=20&skills=reception&experience_min=1&position=Reception')
+      .get('/offers?page=1&pageSize=20&skills=reception&experience_min=1&title=Reception')
       .set('Authorization', `Bearer ${candidateToken}`);
 
     expect(offers.status).toBe(200);
@@ -94,6 +94,40 @@ describe('offers and role-based access', () => {
       .send({ coverLetter: 'I have relevant hospitality experience.' });
 
     expect(apply.status).toBe(201);
+  });
+
+  it('returns filter metadata from active offers only', async () => {
+    const pendingOffer = await request(app)
+      .post('/offers')
+      .set('Authorization', `Bearer ${hotelToken}`)
+      .send({
+        title: 'Spa Therapist',
+        description: 'Deliver wellness treatments and maintain spa guest satisfaction.',
+        requiredSkills: ['massage', 'wellness'],
+        requiredExperience: 4,
+      });
+
+    expect(pendingOffer.status).toBe(201);
+
+    const response = await request(app)
+      .get('/offers/filters')
+      .set('Authorization', `Bearer ${candidateToken}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.titles).toContain('Receptionist');
+    expect(response.body.titles).toContain('Night Receptionist');
+    expect(response.body.titles).not.toContain('Spa Therapist');
+    expect(response.body.skills).toContain('reception');
+    expect(response.body.skills).toContain('english');
+    expect(response.body.experienceLevels).toEqual(expect.arrayContaining([2]));
+  });
+
+  it('rejects hotel access to global offer filter metadata', async () => {
+    const response = await request(app)
+      .get('/offers/filters')
+      .set('Authorization', `Bearer ${hotelToken}`);
+
+    expect(response.status).toBe(403);
   });
 
   it('hotel can view applications across its offers', async () => {
