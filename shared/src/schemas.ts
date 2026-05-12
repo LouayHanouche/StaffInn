@@ -13,9 +13,7 @@ const passwordSchema = z
 const skillsSchema = z
   .array(z.string().trim().min(1).max(50))
   .max(30)
-  .transform((skills) =>
-    Array.from(new Set(skills.map((item) => item.trim().toLowerCase()))),
-  );
+  .transform((skills) => Array.from(new Set(skills.map((item) => item.trim().toLowerCase()))));
 
 const safeTextSchema = z.string().trim().max(2000);
 
@@ -88,6 +86,7 @@ export const filterQuerySchema = z.object({
 });
 
 export const offerSearchQuerySchema = filterQuerySchema.extend({
+  title: z.string().trim().max(180).optional(),
   q: z.string().trim().max(200).optional(),
   sort: z.enum(['createdAt_desc', 'experience_asc', 'experience_desc']).optional(),
 });
