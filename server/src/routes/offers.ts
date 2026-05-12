@@ -15,6 +15,43 @@ import { normalizeSkills, sanitizeText, skillsToText } from '../utils/sanitize.j
 
 export const offersRouter = Router();
 
+offersRouter.get('/filters', requireAuth, requireRole('CANDIDATE'), async (_request, response) => {
+  const activeOffers = await prisma.jobOffer.findMany({
+    where: { status: 'ACTIVE' },
+    select: {
+      title: true,
+      requiredSkills: true,
+      requiredExperience: true,
+    },
+  });
+
+  const titleMap = new Map<string, string>();
+  const skillSet = new Set<string>();
+  const experienceSet = new Set<number>();
+
+  for (const offer of activeOffers) {
+    const normalizedTitle = offer.title.trim().toLowerCase();
+    if (normalizedTitle && !titleMap.has(normalizedTitle)) {
+      titleMap.set(normalizedTitle, offer.title.trim());
+    }
+
+    for (const skill of offer.requiredSkills
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean)) {
+      skillSet.add(skill);
+    }
+
+    experienceSet.add(offer.requiredExperience);
+  }
+
+  response.json({
+    titles: Array.from(titleMap.values()).sort((left, right) => left.localeCompare(right)),
+    skills: Array.from(skillSet).sort((left, right) => left.localeCompare(right)),
+    experienceLevels: Array.from(experienceSet).sort((left, right) => left - right),
+  });
+});
+
 offersRouter.get('/', requireAuth, async (request, response) => {
   if (!request.user) {
     response.status(401).json({ message: 'Unauthorized' });
@@ -42,7 +79,10 @@ offersRouter.get('/', requireAuth, async (request, response) => {
     response.json({
       items: offers.map((offer) => ({
         ...offer,
-        requiredSkills: offer.requiredSkills.split(',').map((skill) => skill.trim()).filter(Boolean),
+        requiredSkills: offer.requiredSkills
+          .split(',')
+          .map((skill) => skill.trim())
+          .filter(Boolean),
       })),
     });
     return;
@@ -54,14 +94,24 @@ offersRouter.get('/', requireAuth, async (request, response) => {
     return;
   }
 
-  const { page, pageSize, skills, experience_min: experienceMin, position, q, sort } = parsed.data;
+  const {
+    page,
+    pageSize,
+    skills,
+    experience_min: experienceMin,
+    position,
+    title,
+    q,
+    sort,
+  } = parsed.data;
+  const titleFilter = title?.trim() || position?.trim();
 
   const cacheKey = cacheKeyFrom('candidate-offers', {
     page,
     pageSize,
     skills,
     experienceMin,
-    position,
+    title: titleFilter,
     q,
     sort,
   });
@@ -75,7 +125,7 @@ offersRouter.get('/', requireAuth, async (request, response) => {
   const where = offerWhereFromFilters({
     skills,
     experienceMin,
-    position,
+    title: titleFilter,
   });
   const whereWithSearch =
     q && q.trim()
@@ -83,10 +133,7 @@ offersRouter.get('/', requireAuth, async (request, response) => {
           AND: [
             where,
             {
-              OR: [
-                { title: { contains: q.trim() } },
-                { description: { contains: q.trim() } },
-              ],
+              OR: [{ title: { contains: q.trim() } }, { description: { contains: q.trim() } }],
             },
           ],
         }
@@ -120,7 +167,10 @@ offersRouter.get('/', requireAuth, async (request, response) => {
   const payload = {
     items: items.map((item) => ({
       ...item,
-      requiredSkills: item.requiredSkills.split(',').map((skill) => skill.trim()).filter(Boolean),
+      requiredSkills: item.requiredSkills
+        .split(',')
+        .map((skill) => skill.trim())
+        .filter(Boolean),
     })),
     pagination: buildPagination(page, pageSize, total),
   };
@@ -161,7 +211,10 @@ offersRouter.post('/', requireAuth, requireRole('HOTEL'), async (request, respon
 
   response.status(201).json({
     ...offer,
-    requiredSkills: offer.requiredSkills.split(',').map((skill) => skill.trim()).filter(Boolean),
+    requiredSkills: offer.requiredSkills
+      .split(',')
+      .map((skill) => skill.trim())
+      .filter(Boolean),
   });
 });
 
@@ -189,7 +242,9 @@ offersRouter.put('/:id', requireAuth, requireRole('HOTEL'), async (request, resp
     return;
   }
 
-  const skills = parsed.data.requiredSkills ? normalizeSkills(parsed.data.requiredSkills) : undefined;
+  const skills = parsed.data.requiredSkills
+    ? normalizeSkills(parsed.data.requiredSkills)
+    : undefined;
   const updated = await prisma.jobOffer.update({
     where: { id: request.params.id },
     data: {
@@ -203,7 +258,10 @@ offersRouter.put('/:id', requireAuth, requireRole('HOTEL'), async (request, resp
 
   response.json({
     ...updated,
-    requiredSkills: updated.requiredSkills.split(',').map((skill) => skill.trim()).filter(Boolean),
+    requiredSkills: updated.requiredSkills
+      .split(',')
+      .map((skill) => skill.trim())
+      .filter(Boolean),
   });
 });
 
@@ -229,97 +287,110 @@ offersRouter.delete('/:id', requireAuth, requireRole('HOTEL'), async (request, r
   response.status(204).send();
 });
 
-offersRouter.post('/:id/apply', requireAuth, requireRole('CANDIDATE'), async (request, response) => {
-  if (!request.user) {
-    response.status(401).json({ message: 'Unauthorized' });
-    return;
-  }
+offersRouter.post(
+  '/:id/apply',
+  requireAuth,
+  requireRole('CANDIDATE'),
+  async (request, response) => {
+    if (!request.user) {
+      response.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
 
-  const parsed = applicationSchema.safeParse(request.body);
-  if (!parsed.success) {
-    response.status(400).json({ message: 'Invalid payload', errors: parsed.error.flatten() });
-    return;
-  }
+    const parsed = applicationSchema.safeParse(request.body);
+    if (!parsed.success) {
+      response.status(400).json({ message: 'Invalid payload', errors: parsed.error.flatten() });
+      return;
+    }
 
-  const candidate = await prisma.candidate.findUnique({ where: { userId: request.user.sub } });
-  if (!candidate) {
-    response.status(404).json({ message: 'Candidate profile not found' });
-    return;
-  }
+    const candidate = await prisma.candidate.findUnique({ where: { userId: request.user.sub } });
+    if (!candidate) {
+      response.status(404).json({ message: 'Candidate profile not found' });
+      return;
+    }
 
-  const offer = await prisma.jobOffer.findUnique({ where: { id: request.params.id } });
-  if (!offer || offer.status !== 'ACTIVE') {
-    response.status(404).json({ message: 'Active offer not found' });
-    return;
-  }
+    const offer = await prisma.jobOffer.findUnique({ where: { id: request.params.id } });
+    if (!offer || offer.status !== 'ACTIVE') {
+      response.status(404).json({ message: 'Active offer not found' });
+      return;
+    }
 
-  const existing = await prisma.application.findFirst({
-    where: {
-      candidateId: candidate.id,
-      jobOfferId: offer.id,
-    },
-  });
+    const existing = await prisma.application.findFirst({
+      where: {
+        candidateId: candidate.id,
+        jobOfferId: offer.id,
+      },
+    });
 
-  if (existing) {
-    response.status(409).json({ message: 'Application already exists for this offer' });
-    return;
-  }
+    if (existing) {
+      response.status(409).json({ message: 'Application already exists for this offer' });
+      return;
+    }
 
-  const application = await prisma.application.create({
-    data: {
-      candidateId: candidate.id,
-      jobOfferId: offer.id,
-      coverLetter: parsed.data.coverLetter ? sanitizeText(parsed.data.coverLetter) : undefined,
-    },
-  });
-  response.status(201).json(application);
-});
+    const application = await prisma.application.create({
+      data: {
+        candidateId: candidate.id,
+        jobOfferId: offer.id,
+        coverLetter: parsed.data.coverLetter ? sanitizeText(parsed.data.coverLetter) : undefined,
+      },
+    });
+    response.status(201).json(application);
+  },
+);
 
-offersRouter.get('/:id/applications', requireAuth, requireRole('HOTEL'), async (request, response) => {
-  if (!request.user) {
-    response.status(401).json({ message: 'Unauthorized' });
-    return;
-  }
+offersRouter.get(
+  '/:id/applications',
+  requireAuth,
+  requireRole('HOTEL'),
+  async (request, response) => {
+    if (!request.user) {
+      response.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
 
-  const hotel = await prisma.hotel.findUnique({ where: { userId: request.user.sub } });
-  if (!hotel) {
-    response.status(404).json({ message: 'Hotel profile not found' });
-    return;
-  }
+    const hotel = await prisma.hotel.findUnique({ where: { userId: request.user.sub } });
+    if (!hotel) {
+      response.status(404).json({ message: 'Hotel profile not found' });
+      return;
+    }
 
-  const offer = await prisma.jobOffer.findUnique({ where: { id: request.params.id } });
-  if (!offer || offer.hotelId !== hotel.id) {
-    response.status(404).json({ message: 'Offer not found' });
-    return;
-  }
+    const offer = await prisma.jobOffer.findUnique({ where: { id: request.params.id } });
+    if (!offer || offer.hotelId !== hotel.id) {
+      response.status(404).json({ message: 'Offer not found' });
+      return;
+    }
 
-  const applications = await prisma.application.findMany({
-    where: { jobOfferId: offer.id },
-    include: {
-      candidate: {
-        select: {
-          id: true,
-          fullName: true,
-          position: true,
-          experienceYears: true,
-          skills: true,
-          cvPath: true,
+    const applications = await prisma.application.findMany({
+      where: { jobOfferId: offer.id },
+      include: {
+        candidate: {
+          select: {
+            id: true,
+            fullName: true,
+            position: true,
+            experienceYears: true,
+            skills: true,
+            cvPath: true,
+          },
         },
       },
-    },
-    orderBy: { appliedAt: 'desc' },
-  });
+      orderBy: { appliedAt: 'desc' },
+    });
 
-  response.json({
-    items: applications.map((application) => ({
-      ...application,
-      candidate: {
-        ...application.candidate,
-        skills: application.candidate.skills.split(',').map((skill) => skill.trim()).filter(Boolean),
-      },
-    })),
-  });
-});
+    response.json({
+      items: applications.map((application) => ({
+        ...application,
+        candidate: {
+          ...application.candidate,
+          skills: application.candidate.skills
+            .split(',')
+            .map((skill) => skill.trim())
+            .filter(Boolean),
+        },
+      })),
+    });
+  },
+);
 
 offersRouter.patch(
   '/:id/applications/:applicationId',

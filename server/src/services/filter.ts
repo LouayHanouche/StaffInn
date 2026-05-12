@@ -1,16 +1,26 @@
 import { Prisma } from '@prisma/client';
 
-interface FilterInput {
+interface CandidateFilterInput {
   skills: string[];
   experienceMin?: number;
   position?: string;
 }
 
+interface OfferFilterInput {
+  skills: string[];
+  experienceMin?: number;
+  title?: string;
+}
+
 const escapeLike = (value: string): string => value.replace(/[%_]/g, '\\$&');
 
-export const candidateWhereFromFilters = (filters: FilterInput): Prisma.CandidateWhereInput => ({
+export const candidateWhereFromFilters = (
+  filters: CandidateFilterInput,
+): Prisma.CandidateWhereInput => ({
   AND: [
-    typeof filters.experienceMin === 'number' ? { experienceYears: { gte: filters.experienceMin } } : {},
+    typeof filters.experienceMin === 'number'
+      ? { experienceYears: { gte: filters.experienceMin } }
+      : {},
     filters.position
       ? {
           position: {
@@ -26,14 +36,16 @@ export const candidateWhereFromFilters = (filters: FilterInput): Prisma.Candidat
   ],
 });
 
-export const offerWhereFromFilters = (filters: FilterInput): Prisma.JobOfferWhereInput => ({
+export const offerWhereFromFilters = (filters: OfferFilterInput): Prisma.JobOfferWhereInput => ({
   AND: [
     { status: 'ACTIVE' },
-    typeof filters.experienceMin === 'number' ? { requiredExperience: { gte: filters.experienceMin } } : {},
-    filters.position
+    typeof filters.experienceMin === 'number'
+      ? { requiredExperience: { gte: filters.experienceMin } }
+      : {},
+    filters.title
       ? {
           title: {
-            contains: escapeLike(filters.position),
+            contains: escapeLike(filters.title),
           },
         }
       : {},
