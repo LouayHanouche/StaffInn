@@ -31,3 +31,4 @@ tests/server/storage/cv/*
 client/.vite/
 client/dist/
 client/release/
+.envsitter/
