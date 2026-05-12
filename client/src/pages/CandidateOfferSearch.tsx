@@ -3,6 +3,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, api } from '../lib/api';
 import { DashboardLayout } from '../components/DashboardLayout';
 import { Toast } from '../components/Toast';
+import {
+  mergeSkillSuggestions,
+  normalizeSkillsQuery,
+  normalizeSkillToken,
+  toggleCommaSeparatedSkill,
+} from './candidate-offer-search-utils';
 
 interface Application {
   id: string;
@@ -17,6 +23,19 @@ interface JobOffer {
   requiredExperience: number;
   requiredSkills?: string[];
   hotel: { name: string; address?: string | null };
+}
+
+interface OfferFilterMetadata {
+  titles: string[];
+  skills: string[];
+  experienceLevels: number[];
+}
+
+interface CandidateProfileData {
+  fullName: string;
+  position: string;
+  experienceYears: number;
+  skills: string[];
 }
 
 type SortOption = 'createdAt_desc' | 'experience_asc' | 'experience_desc';
@@ -40,7 +59,7 @@ export const CandidateOfferSearch = (): JSX.Element => {
 
   // Filters
   const [q, setQ] = useState('');
-  const [position, setPosition] = useState('');
+  const [title, setTitle] = useState('');
   const [skills, setSkills] = useState('');
   const [experienceMin, setExperienceMin] = useState<number>(0);
   const [sort, setSort] = useState<SortOption>('createdAt_desc');
@@ -49,11 +68,25 @@ export const CandidateOfferSearch = (): JSX.Element => {
   const [page, setPage] = useState(1);
   const pageSize = 12;
 
+  const filterMetadataQuery = useQuery({
+    queryKey: ['candidate-offer-filter-metadata'],
+    queryFn: () => api.get<OfferFilterMetadata>('/offers/filters'),
+    refetchInterval: 60_000,
+  });
+
+  const candidateProfileQuery = useQuery({
+    queryKey: ['candidate-profile'],
+    queryFn: () => api.get<{ profile: CandidateProfileData }>('/candidates/profile'),
+    refetchInterval: 60_000,
+  });
+
   const applicationsQuery = useQuery({
     queryKey: ['candidate-applications'],
     queryFn: () => api.get<{ items: Application[] }>('/candidates/applications'),
     refetchInterval: 15_000,
   });
+
+  const normalizedSkillsQuery = useMemo(() => normalizeSkillsQuery(skills), [skills]);
 
   const offersQueryString = useMemo(
     () =>
@@ -61,17 +94,21 @@ export const CandidateOfferSearch = (): JSX.Element => {
         page,
         pageSize,
         q: q.trim() ? q.trim() : undefined,
-        position: position.trim() ? position.trim() : undefined,
-        skills: skills.trim() ? skills.trim() : undefined,
+        title: title.trim() ? title.trim() : undefined,
+        skills: normalizedSkillsQuery ? normalizedSkillsQuery : undefined,
         experience_min: experienceMin > 0 ? experienceMin : undefined,
         sort,
       }),
-    [experienceMin, page, position, q, skills, sort],
+    [experienceMin, normalizedSkillsQuery, page, q, sort, title],
   );
 
   const offersQuery = useQuery({
     queryKey: ['candidate-offers-search', offersQueryString],
-    queryFn: () => api.get<{ items: JobOffer[]; pagination?: { page: number; pageSize: number; total: number } }>(`/offers?${offersQueryString}`),
+    queryFn: () =>
+      api.get<{
+        items: JobOffer[];
+        pagination?: { page: number; pageSize: number; total: number };
+      }>(`/offers?${offersQueryString}`),
     refetchInterval: 15_000,
   });
 
@@ -80,6 +117,17 @@ export const CandidateOfferSearch = (): JSX.Element => {
   const offers = offersQuery.data?.items ?? [];
   const total = offersQuery.data?.pagination?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const titleOptions = filterMetadataQuery.data?.titles ?? [];
+  const candidateSkills = candidateProfileQuery.data?.profile.skills ?? [];
+  const skillOptions = mergeSkillSuggestions(
+    candidateSkills,
+    filterMetadataQuery.data?.skills ?? [],
+  );
+  const experienceOptions = filterMetadataQuery.data?.experienceLevels ?? [];
+  const selectedSkills = useMemo(
+    () => new Set(normalizedSkillsQuery.split(',').filter(Boolean)),
+    [normalizedSkillsQuery],
+  );
 
   const [viewingOffer, setViewingOffer] = useState<JobOffer | null>(null);
   const [applyingOffer, setApplyingOffer] = useState<JobOffer | null>(null);
@@ -137,16 +185,22 @@ export const CandidateOfferSearch = (): JSX.Element => {
             <label className="filter-group__label" htmlFor="offer-position">
               Poste
             </label>
-            <input
+            <select
               id="offer-position"
-              className="filter-group__input"
-              placeholder="Ex: réceptionniste"
-              value={position}
+              className="filter-group__select"
+              value={title}
               onChange={(e) => {
-                setPosition(e.target.value);
+                setTitle(e.target.value);
                 setPage(1);
               }}
-            />
+            >
+              <option value="">Tous les postes</option>
+              {titleOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="filter-group">
@@ -155,32 +209,101 @@ export const CandidateOfferSearch = (): JSX.Element => {
             </label>
             <input
               id="offer-skills"
+              list="offer-skills-suggestions"
               className="filter-group__input"
-              placeholder="Ex: anglais, service, PMS"
+              placeholder={
+                skillOptions.length > 0
+                  ? `Ex: ${skillOptions.slice(0, 3).join(', ')}`
+                  : 'Ex: anglais, service, PMS'
+              }
               value={skills}
               onChange={(e) => {
                 setSkills(e.target.value);
                 setPage(1);
               }}
             />
+            <datalist id="offer-skills-suggestions">
+              {skillOptions.map((option) => (
+                <option key={option} value={option} />
+              ))}
+            </datalist>
+            {candidateSkills.length > 0 && (
+              <div style={{ marginTop: 10 }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 8,
+                    marginBottom: 8,
+                  }}
+                >
+                  <span className="filter-group__label" style={{ marginBottom: 0 }}>
+                    Mes compétences
+                  </span>
+                  <button
+                    type="button"
+                    className="btn btn--ghost btn--sm"
+                    onClick={() => {
+                      setSkills(candidateSkills.join(', '));
+                      setPage(1);
+                    }}
+                  >
+                    Tout utiliser
+                  </button>
+                </div>
+                <div className="skills-list">
+                  {candidateSkills.map((skill) => {
+                    const isSelected = selectedSkills.has(normalizeSkillToken(skill));
+
+                    return (
+                      <button
+                        key={skill}
+                        type="button"
+                        className="skill-tag"
+                        style={{
+                          cursor: 'pointer',
+                          border: isSelected
+                            ? '1px solid var(--color-primary)'
+                            : '1px solid transparent',
+                          background: isSelected ? 'rgba(212, 175, 55, 0.18)' : undefined,
+                        }}
+                        onClick={() => {
+                          setSkills((currentValue) =>
+                            toggleCommaSeparatedSkill(currentValue, skill),
+                          );
+                          setPage(1);
+                        }}
+                      >
+                        {skill}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="filter-group">
             <label className="filter-group__label" htmlFor="offer-exp">
               Expérience minimum (années)
             </label>
-            <input
+            <select
               id="offer-exp"
-              type="number"
-              min={0}
-              max={60}
-              className="filter-group__input"
-              value={experienceMin}
+              className="filter-group__select"
+              value={experienceMin > 0 ? String(experienceMin) : ''}
               onChange={(e) => {
-                setExperienceMin(Number(e.target.value));
+                setExperienceMin(e.target.value ? Number(e.target.value) : 0);
                 setPage(1);
               }}
-            />
+            >
+              <option value="">Tous niveaux</option>
+              {experienceOptions.map((value) => (
+                <option key={value} value={value}>
+                  {value}+ ans
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="filter-group">
@@ -208,7 +331,7 @@ export const CandidateOfferSearch = (): JSX.Element => {
             style={{ width: '100%' }}
             onClick={() => {
               setQ('');
-              setPosition('');
+              setTitle('');
               setSkills('');
               setExperienceMin(0);
               setSort('createdAt_desc');
@@ -250,7 +373,10 @@ export const CandidateOfferSearch = (): JSX.Element => {
                         <span>💼 {offer.requiredExperience} ans exp.</span>
                       </div>
                       <div className="job-card__actions">
-                        <button className="btn btn--ghost btn--sm" onClick={() => setViewingOffer(offer)}>
+                        <button
+                          className="btn btn--ghost btn--sm"
+                          onClick={() => setViewingOffer(offer)}
+                        >
                           Détails
                         </button>
                         <button
@@ -370,10 +496,18 @@ export const CandidateOfferSearch = (): JSX.Element => {
                 />
               </div>
               <div className="modal__actions">
-                <button className="btn btn--ghost" onClick={() => setApplyingOffer(null)} type="button">
+                <button
+                  className="btn btn--ghost"
+                  onClick={() => setApplyingOffer(null)}
+                  type="button"
+                >
                   Annuler
                 </button>
-                <button className="btn btn--primary" type="submit" disabled={applyMutation.isPending}>
+                <button
+                  className="btn btn--primary"
+                  type="submit"
+                  disabled={applyMutation.isPending}
+                >
                   {applyMutation.isPending ? 'Envoi...' : 'Envoyer'}
                 </button>
               </div>
@@ -386,4 +520,3 @@ export const CandidateOfferSearch = (): JSX.Element => {
     </DashboardLayout>
   );
 };
-

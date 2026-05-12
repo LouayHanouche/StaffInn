@@ -1,8 +1,13 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { DashboardLayout } from '../components/DashboardLayout';
 import { ApiError, api, apiBaseUrl } from '../lib/api';
 import { Toast } from '../components/Toast';
+import {
+  normalizeSkillsQuery,
+  normalizeSkillToken,
+  toggleCommaSeparatedSkill,
+} from './candidate-offer-search-utils';
 
 interface Candidate {
   id: string;
@@ -28,16 +33,6 @@ const experienceOptions: { value: ExperienceFilter; label: string }[] = [
   { value: '0-2', label: '0-2 ans' },
   { value: '3-5', label: '3-5 ans' },
   { value: '5+', label: '5+ ans' },
-];
-
-const positionOptions = [
-  { value: '', label: 'Tous les postes' },
-  { value: 'receptionniste', label: 'Réceptionniste' },
-  { value: 'concierge', label: 'Concierge' },
-  { value: 'serveur', label: 'Serveur/Serveuse' },
-  { value: 'cuisinier', label: 'Cuisinier' },
-  { value: 'femme_chambre', label: 'Femme de chambre' },
-  { value: 'manager', label: 'Manager' },
 ];
 
 function getInitials(fullName?: string, email?: string): string {
@@ -70,12 +65,13 @@ export const CVDatabase = (): JSX.Element => {
   const [recruitingCandidate, setRecruitingCandidate] = useState<Candidate | null>(null);
   const [selectedOfferId, setSelectedOfferId] = useState('');
   const [recruitStatus, setRecruitStatus] = useState('INTERVIEW');
-  const [recruitToast, setRecruitToast] = useState<{ message: string | null; type: 'ok' | 'error' }>(
-    {
-      message: null,
-      type: 'ok',
-    },
-  );
+  const [recruitToast, setRecruitToast] = useState<{
+    message: string | null;
+    type: 'ok' | 'error';
+  }>({
+    message: null,
+    type: 'ok',
+  });
 
   const candidatesQuery = useQuery({
     queryKey: ['cv-database'],
@@ -92,24 +88,58 @@ export const CVDatabase = (): JSX.Element => {
   const candidates = candidatesQuery.data?.items ?? [];
   const offers = (offersQuery.data?.items ?? []).filter((offer) => offer.title);
   const activeOffers = offers.filter((offer) => offer.status === 'ACTIVE');
+  const positionOptions = useMemo(() => {
+    const map = new Map<string, string>();
+
+    candidates.forEach((candidate) => {
+      const position = candidate.position?.trim();
+      if (!position) return;
+      const normalized = normalizeSkillToken(position);
+      if (!normalized || map.has(normalized)) return;
+      map.set(normalized, position);
+    });
+
+    const dynamicOptions = Array.from(map.entries())
+      .map(([value, label]) => ({ value, label }))
+      .sort((left, right) => left.label.localeCompare(right.label));
+
+    return [{ value: '', label: 'Tous les postes' }, ...dynamicOptions];
+  }, [candidates]);
+
+  const skillOptions = useMemo(() => {
+    const map = new Map<string, string>();
+
+    candidates.forEach((candidate) => {
+      (candidate.skills ?? []).forEach((skill) => {
+        const normalized = normalizeSkillToken(skill);
+        if (!normalized || map.has(normalized)) return;
+        map.set(normalized, skill.trim());
+      });
+    });
+
+    return Array.from(map.values()).sort((left, right) => left.localeCompare(right));
+  }, [candidates]);
+
+  const normalizedSkillsFilter = useMemo(() => normalizeSkillsQuery(skillsFilter), [skillsFilter]);
+  const selectedSkills = useMemo(
+    () => new Set(normalizedSkillsFilter.split(',').filter(Boolean)),
+    [normalizedSkillsFilter],
+  );
 
   const filteredCandidates = candidates.filter((candidate) => {
     if (!matchesExperienceFilter(candidate.experienceYears, experienceFilter)) {
       return false;
     }
 
-    if (positionFilter && candidate.position?.toLowerCase() !== positionFilter) {
+    if (positionFilter && normalizeSkillToken(candidate.position ?? '') !== positionFilter) {
       return false;
     }
 
-    if (skillsFilter) {
-      const searchTerms = skillsFilter
-        .toLowerCase()
-        .split(',')
-        .map((s) => s.trim());
-      const candidateSkills = (candidate.skills ?? []).map((s) => s.toLowerCase());
+    if (normalizedSkillsFilter) {
+      const searchTerms = normalizedSkillsFilter.split(',');
+      const candidateSkills = (candidate.skills ?? []).map((skill) => normalizeSkillToken(skill));
       const hasMatchingSkill = searchTerms.some((term) =>
-        candidateSkills.some((skill) => skill.includes(term))
+        candidateSkills.some((skill) => skill.includes(term)),
       );
       if (!hasMatchingSkill) return false;
     }
@@ -167,10 +197,54 @@ export const CVDatabase = (): JSX.Element => {
               id="skills-filter"
               type="text"
               className="filter-group__input"
-              placeholder="Ex: anglais, service..."
+              list="candidate-skills-suggestions"
+              placeholder={
+                skillOptions.length > 0
+                  ? `Ex: ${skillOptions.slice(0, 3).join(', ')}`
+                  : 'Ex: anglais, service...'
+              }
               value={skillsFilter}
               onChange={(e) => setSkillsFilter(e.target.value)}
             />
+            <datalist id="candidate-skills-suggestions">
+              {skillOptions.map((option) => (
+                <option key={option} value={option} />
+              ))}
+            </datalist>
+            {skillOptions.length > 0 && (
+              <div style={{ marginTop: 10 }}>
+                <span className="filter-group__label" style={{ marginBottom: 8, display: 'block' }}>
+                  Compétences candidates
+                </span>
+                <div className="skills-list">
+                  {skillOptions.map((skill) => {
+                    const isSelected = selectedSkills.has(normalizeSkillToken(skill));
+
+                    return (
+                      <button
+                        key={skill}
+                        type="button"
+                        className="skill-tag"
+                        style={{
+                          cursor: 'pointer',
+                          border: isSelected
+                            ? '1px solid var(--color-primary)'
+                            : '1px solid transparent',
+                          background: isSelected ? 'rgba(212, 175, 55, 0.18)' : undefined,
+                        }}
+                        onClick={() => {
+                          setSkillsFilter((currentValue) =>
+                            toggleCommaSeparatedSkill(currentValue, skill),
+                          );
+                        }}
+                      >
+                        {skill}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           <button
@@ -188,7 +262,10 @@ export const CVDatabase = (): JSX.Element => {
 
           <div className="filter-stats">
             <span className="filter-stats__count">{filteredCandidates.length}</span>
-            <span className="filter-stats__label">candidat{filteredCandidates.length !== 1 ? 's' : ''} trouvé{filteredCandidates.length !== 1 ? 's' : ''}</span>
+            <span className="filter-stats__label">
+              candidat{filteredCandidates.length !== 1 ? 's' : ''} trouvé
+              {filteredCandidates.length !== 1 ? 's' : ''}
+            </span>
           </div>
         </aside>
 
@@ -431,7 +508,10 @@ export const CVDatabase = (): JSX.Element => {
                       setRecruitToast({ message: error.message, type: 'error' });
                       return;
                     }
-                    setRecruitToast({ message: 'Impossible de recruter ce candidat', type: 'error' });
+                    setRecruitToast({
+                      message: 'Impossible de recruter ce candidat',
+                      type: 'error',
+                    });
                   }
                 }}
               >
