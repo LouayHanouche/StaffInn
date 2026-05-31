@@ -20,13 +20,35 @@ export class ApiError extends Error {
   }
 }
 
-const request = async <T>(path: string, init: RequestInit = {}): Promise<T> => {
-  const headers = new Headers(init.headers);
-  headers.set('Content-Type', 'application/json');
+const buildHeaders = (headersInit?: HeadersInit): Headers => {
+  const headers = new Headers(headersInit);
   const token = tokenStore.get();
+
   if (token) {
     headers.set('Authorization', `Bearer ${token}`);
   }
+
+  return headers;
+};
+
+const toApiError = async (response: Response, fallbackMessage: string): Promise<ApiError> => {
+  const payload = await response.json().catch(() => ({ message: fallbackMessage }));
+  const message =
+    typeof payload === 'object' &&
+    payload &&
+    'message' in payload &&
+    typeof payload.message === 'string'
+      ? payload.message
+      : fallbackMessage;
+  const details =
+    typeof payload === 'object' && payload && 'errors' in payload ? payload.errors : undefined;
+
+  return new ApiError(response.status, message, details);
+};
+
+const request = async <T>(path: string, init: RequestInit = {}): Promise<T> => {
+  const headers = buildHeaders(init.headers);
+  headers.set('Content-Type', 'application/json');
 
   const response = await fetch(`${apiBaseUrl}${path}`, {
     ...init,
@@ -35,17 +57,7 @@ const request = async <T>(path: string, init: RequestInit = {}): Promise<T> => {
   });
 
   if (!response.ok) {
-    const payload = await response.json().catch(() => ({ message: 'Request failed' }));
-    const message =
-      typeof payload === 'object' &&
-      payload &&
-      'message' in payload &&
-      typeof payload.message === 'string'
-        ? payload.message
-        : 'Request failed';
-    const details =
-      typeof payload === 'object' && payload && 'errors' in payload ? payload.errors : undefined;
-    throw new ApiError(response.status, message, details);
+    throw await toApiError(response, 'Request failed');
   }
 
   if (response.status === 204) {
@@ -66,15 +78,51 @@ export const api = {
   delete: <T>(path: string): Promise<T> => request<T>(path, { method: 'DELETE' }),
 };
 
+export const openProtectedCv = async (cvPath: string): Promise<void> => {
+  const response = await fetch(`${apiBaseUrl}/files/cv/${cvPath}`, {
+    method: 'GET',
+    credentials: 'include',
+    headers: buildHeaders(),
+  });
+
+  if (!response.ok) {
+    throw await toApiError(response, 'CV download failed');
+  }
+
+  const fileBlob = await response.blob();
+  const objectUrl = URL.createObjectURL(fileBlob);
+  const contentType = response.headers.get('content-type') ?? fileBlob.type;
+  const isPdf = contentType.toLowerCase().includes('pdf') || cvPath.toLowerCase().endsWith('.pdf');
+
+  if (isPdf) {
+    const openedWindow = window.open(objectUrl, '_blank', 'noopener,noreferrer');
+    if (!openedWindow) {
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = cvPath;
+      link.rel = 'noopener noreferrer';
+      link.click();
+    }
+  } else {
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = cvPath;
+    link.rel = 'noopener noreferrer';
+    link.click();
+  }
+
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+};
+
+export const deleteCandidateCv = async (): Promise<void> => {
+  await api.delete('/candidates/profile/cv');
+};
+
 export const uploadCv = async (file: File): Promise<{ profile: unknown }> => {
   const formData = new FormData();
   formData.append('cv', file);
 
-  const token = tokenStore.get();
-  const headers = new Headers();
-  if (token) {
-    headers.set('Authorization', `Bearer ${token}`);
-  }
+  const headers = buildHeaders();
 
   const response = await fetch(`${apiBaseUrl}/candidates/profile/cv`, {
     method: 'POST',
@@ -84,17 +132,7 @@ export const uploadCv = async (file: File): Promise<{ profile: unknown }> => {
   });
 
   if (!response.ok) {
-    const payload = await response.json().catch(() => ({ message: 'Upload failed' }));
-    const message =
-      typeof payload === 'object' &&
-      payload &&
-      'message' in payload &&
-      typeof payload.message === 'string'
-        ? payload.message
-        : 'Upload failed';
-    const details =
-      typeof payload === 'object' && payload && 'errors' in payload ? payload.errors : undefined;
-    throw new ApiError(response.status, message, details);
+    throw await toApiError(response, 'Upload failed');
   }
 
   return (await response.json()) as { profile: unknown };

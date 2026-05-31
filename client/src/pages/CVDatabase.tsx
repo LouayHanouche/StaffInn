@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { DashboardLayout } from '../components/DashboardLayout';
-import { ApiError, api, apiBaseUrl } from '../lib/api';
+import { ApiError, api, openProtectedCv } from '../lib/api';
 import { Toast } from '../components/Toast';
 import {
   normalizeSkillsQuery,
@@ -146,6 +146,19 @@ export const CVDatabase = (): JSX.Element => {
 
     return true;
   });
+
+  const handleOpenCv = async (cvPath: string): Promise<void> => {
+    try {
+      await openProtectedCv(cvPath);
+    } catch (error) {
+      if (error instanceof ApiError) {
+        setRecruitToast({ message: error.message, type: 'error' });
+        return;
+      }
+
+      setRecruitToast({ message: 'Impossible d’ouvrir le CV', type: 'error' });
+    }
+  };
 
   return (
     <DashboardLayout title="Base de Candidats">
@@ -353,14 +366,18 @@ export const CVDatabase = (): JSX.Element => {
                     Recruter
                   </button>
                   {candidate.cvPath && (
-                    <a
-                      href={`${apiBaseUrl}/files/cv/${candidate.cvPath}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <button
+                      type="button"
                       className="btn btn--outline btn--sm"
+                      onClick={() => {
+                        const cvPath = candidate.cvPath;
+                        if (cvPath) {
+                          void handleOpenCv(cvPath);
+                        }
+                      }}
                     >
-                      📄 Télécharger CV
-                    </a>
+                      📄 Ouvrir le CV
+                    </button>
                   )}
                 </div>
               </div>
@@ -431,14 +448,18 @@ export const CVDatabase = (): JSX.Element => {
                 Fermer
               </button>
               {viewingCandidate.cvPath && (
-                <a
-                  href={`${apiBaseUrl}/files/cv/${viewingCandidate.cvPath}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  type="button"
                   className="btn btn--primary"
+                  onClick={() => {
+                    const cvPath = viewingCandidate.cvPath;
+                    if (cvPath) {
+                      void handleOpenCv(cvPath);
+                    }
+                  }}
                 >
-                  📄 Télécharger CV
-                </a>
+                  📄 Ouvrir le CV
+                </button>
               )}
             </div>
           </div>

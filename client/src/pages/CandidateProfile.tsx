@@ -1,6 +1,6 @@
 import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ApiError, api, apiBaseUrl, uploadCv } from '../lib/api';
+import { ApiError, api, deleteCandidateCv, openProtectedCv, uploadCv } from '../lib/api';
 import { Toast } from '../components/Toast';
 import { DashboardLayout } from '../components/DashboardLayout';
 
@@ -49,6 +49,35 @@ export const CandidateProfile = (): JSX.Element => {
     onError: () => setToast({ message: 'Fichier invalide (PDF/DOCX, max 5MB)', type: 'error' }),
   });
 
+  const deleteCvMutation = useMutation({
+    mutationFn: () => deleteCandidateCv(),
+    onSuccess: async () => {
+      setToast({ message: 'CV supprimé', type: 'ok' });
+      await queryClient.invalidateQueries({ queryKey: ['candidate-profile'] });
+    },
+    onError: (error) => {
+      if (error instanceof ApiError) {
+        setToast({ message: error.message, type: 'error' });
+        return;
+      }
+
+      setToast({ message: 'Impossible de supprimer le CV', type: 'error' });
+    },
+  });
+
+  const handleViewCv = async (cvPath: string): Promise<void> => {
+    try {
+      await openProtectedCv(cvPath);
+    } catch (error) {
+      if (error instanceof ApiError) {
+        setToast({ message: error.message, type: 'error' });
+        return;
+      }
+
+      setToast({ message: 'Impossible d’ouvrir le CV', type: 'error' });
+    }
+  };
+
   const profile = profileQuery.data?.profile;
 
   const onSubmitProfile = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
@@ -95,14 +124,30 @@ export const CandidateProfile = (): JSX.Element => {
               {profile?.cvPath ? (
                 <div className="cv-status cv-status--uploaded">
                   <span>✅ CV téléchargé</span>
-                  <a
-                    href={`${apiBaseUrl}/files/cv/${profile.cvPath}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn btn--ghost btn--sm"
-                  >
-                    Voir
-                  </a>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="btn btn--ghost btn--sm"
+                      onClick={() => {
+                        const cvPath = profile.cvPath;
+                        if (cvPath) {
+                          void handleViewCv(cvPath);
+                        }
+                      }}
+                    >
+                      Ouvrir le CV
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn--ghost btn--sm"
+                      disabled={deleteCvMutation.isPending}
+                      onClick={() => {
+                        void deleteCvMutation.mutateAsync();
+                      }}
+                    >
+                      {deleteCvMutation.isPending ? 'Suppression...' : 'Supprimer le CV'}
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <p className="text-muted" style={{ marginBottom: 8 }}>
@@ -176,7 +221,11 @@ export const CandidateProfile = (): JSX.Element => {
                 required
               />
             </div>
-            <button type="submit" className="btn btn--primary" disabled={updateProfileMutation.isPending}>
+            <button
+              type="submit"
+              className="btn btn--primary"
+              disabled={updateProfileMutation.isPending}
+            >
               {updateProfileMutation.isPending ? 'Enregistrement...' : 'Enregistrer'}
             </button>
           </form>

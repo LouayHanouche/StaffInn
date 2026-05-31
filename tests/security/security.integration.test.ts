@@ -1,4 +1,6 @@
 import request from 'supertest';
+import fs from 'node:fs';
+import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from '../../server/src/app.js';
 import { prisma } from '../../server/src/db/prisma.js';
@@ -8,6 +10,13 @@ describe('security tests', () => {
   const app = createApp();
   let candidateToken = '';
   let hotelToken = '';
+  let uploadedCvPath = '';
+  let deletedCvPath = '';
+  let otherCandidateToken = '';
+  let otherUploadedCvPath = '';
+
+  const cvStoragePath = (filename: string): string =>
+    path.join(process.cwd(), 'server', 'storage', 'cv', filename);
 
   beforeAll(async () => {
     resetDatabase();
@@ -69,6 +78,130 @@ describe('security tests', () => {
 
     expect(response.status).toBe(200);
     expect(response.body.profile.cvPath).toContain('.pdf');
+    uploadedCvPath = response.body.profile.cvPath as string;
+    expect(fs.existsSync(cvStoragePath(uploadedCvPath))).toBe(true);
+  });
+
+  it('replaces an existing CV and removes the old stored file', async () => {
+    const previousCvPath = uploadedCvPath;
+
+    const response = await request(app)
+      .post('/candidates/profile/cv')
+      .set('Authorization', `Bearer ${candidateToken}`)
+      .attach('cv', Buffer.from('%PDF-1.4 replacement pdf content'), {
+        filename: 'resume-updated.pdf',
+        contentType: 'application/pdf',
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.profile.cvPath).toContain('.pdf');
+    uploadedCvPath = response.body.profile.cvPath as string;
+    expect(uploadedCvPath).not.toBe(previousCvPath);
+    expect(fs.existsSync(cvStoragePath(previousCvPath))).toBe(false);
+    expect(fs.existsSync(cvStoragePath(uploadedCvPath))).toBe(true);
+  });
+
+  it('rejects CV download without authorization header', async () => {
+    const response = await request(app).get(`/files/cv/${uploadedCvPath}`);
+
+    expect(response.status).toBe(401);
+    expect(response.body.message).toBe('Missing or invalid authorization header');
+  });
+
+  it('allows a candidate to download their own CV with authorization', async () => {
+    const response = await request(app)
+      .get(`/files/cv/${uploadedCvPath}`)
+      .set('Authorization', `Bearer ${candidateToken}`);
+
+    expect(response.status).toBe(200);
+    expect(response.headers['content-type']).toContain('pdf');
+  });
+
+  it('allows a hotel to download an uploaded candidate CV with authorization', async () => {
+    const response = await request(app)
+      .get(`/files/cv/${uploadedCvPath}`)
+      .set('Authorization', `Bearer ${hotelToken}`);
+
+    expect(response.status).toBe(200);
+    expect(response.headers['content-type']).toContain('pdf');
+  });
+
+  it('prevents a candidate from downloading another candidate CV', async () => {
+    const register = await request(app).post('/auth/register').send({
+      role: 'CANDIDATE',
+      email: 'second-candidate@test.local',
+      password: 'SecondPass123',
+      fullName: 'Second Candidate',
+    });
+
+    expect(register.status).toBe(201);
+    otherCandidateToken = register.body.accessToken as string;
+
+    const upload = await request(app)
+      .post('/candidates/profile/cv')
+      .set('Authorization', `Bearer ${otherCandidateToken}`)
+      .attach('cv', Buffer.from('%PDF-1.4 second candidate pdf content'), {
+        filename: 'second-resume.pdf',
+        contentType: 'application/pdf',
+      });
+
+    expect(upload.status).toBe(200);
+    otherUploadedCvPath = upload.body.profile.cvPath as string;
+
+    const response = await request(app)
+      .get(`/files/cv/${otherUploadedCvPath}`)
+      .set('Authorization', `Bearer ${candidateToken}`);
+
+    expect(response.status).toBe(404);
+    expect(response.body.message).toBe('File not found');
+  });
+
+  it('forbids hotel users from deleting candidate CVs through the candidate endpoint', async () => {
+    const response = await request(app)
+      .delete('/candidates/profile/cv')
+      .set('Authorization', `Bearer ${hotelToken}`);
+
+    expect(response.status).toBe(403);
+  });
+
+  it('allows a candidate to delete their CV and removes the stored file', async () => {
+    const currentCvPath = uploadedCvPath;
+
+    const response = await request(app)
+      .delete('/candidates/profile/cv')
+      .set('Authorization', `Bearer ${candidateToken}`);
+
+    expect(response.status).toBe(204);
+    expect(fs.existsSync(cvStoragePath(currentCvPath))).toBe(false);
+
+    const candidate = await prisma.candidate.findFirst({
+      where: {
+        user: {
+          email: 'candidate@test.local',
+        },
+      },
+    });
+
+    expect(candidate?.cvPath ?? null).toBeNull();
+    deletedCvPath = currentCvPath;
+    uploadedCvPath = '';
+  });
+
+  it('returns not found for a deleted CV download', async () => {
+    const response = await request(app)
+      .get(`/files/cv/${deletedCvPath}`)
+      .set('Authorization', `Bearer ${candidateToken}`);
+
+    expect(response.status).toBe(404);
+    expect(response.body.message).toBe('File not found');
+  });
+
+  it('allows idempotent candidate CV deletion when no CV exists', async () => {
+    const response = await request(app)
+      .delete('/candidates/profile/cv')
+      .set('Authorization', `Bearer ${candidateToken}`);
+
+    expect(response.status).toBe(204);
   });
 
   it('expired access token cannot access protected route', async () => {

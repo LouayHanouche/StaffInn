@@ -3,15 +3,9 @@ import path from 'node:path';
 import { Router } from 'express';
 import { prisma } from '../db/prisma.js';
 import { requireAuth } from '../middleware/auth.js';
+import { cvUploadDirectory, isSafeCvFilename } from '../utils/cv-files.js';
 
 export const filesRouter = Router();
-
-const uploadDirectory = path.join(process.cwd(), 'server', 'storage', 'cv');
-
-const isSafeCvFilename = (filename: string): boolean => {
-  // Matches the upload naming scheme: `${Date.now()}-${random}${ext}`
-  return /^[0-9]+-[a-z0-9]{8}\.(pdf|doc|docx)$/i.test(filename);
-};
 
 filesRouter.get('/cv/:filename', requireAuth, async (request, response) => {
   const filename = request.params.filename;
@@ -39,7 +33,7 @@ filesRouter.get('/cv/:filename', requireAuth, async (request, response) => {
     }
   }
 
-  const fullPath = path.join(uploadDirectory, filename);
+  const fullPath = path.join(cvUploadDirectory, filename);
   if (!fs.existsSync(fullPath)) {
     response.status(404).json({ message: 'File not found' });
     return;
@@ -47,4 +41,3 @@ filesRouter.get('/cv/:filename', requireAuth, async (request, response) => {
 
   response.sendFile(fullPath);
 });
-
