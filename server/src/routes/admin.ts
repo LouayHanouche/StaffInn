@@ -6,9 +6,6 @@ import {
   adminCandidateProfileUpdateSchema,
   adminHotelProfileUpdateSchema,
   filterQuerySchema,
-  reportQuerySchema,
-  reportCreateSchema,
-  reportUpdateSchema,
 } from '@staffinn/shared';
 import { prisma } from '../db/prisma.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
@@ -281,99 +278,4 @@ adminRouter.get('/offers/:id/moderation-history', async (request, response) => {
   });
 
   response.json({ items: decisions });
-});
-
-// === Wave 2.4: Report Management Endpoints ===
-adminRouter.get('/reports', async (request, response) => {
-  const parsed = reportQuerySchema.safeParse(request.query);
-  if (!parsed.success) {
-    response.status(400).json({ message: 'Invalid query', errors: parsed.error.flatten() });
-    return;
-  }
-
-  const { page, pageSize, status, targetType } = parsed.data;
-
-  const where = {
-    ...(status ? { status } : {}),
-    ...(targetType ? { targetType } : {}),
-  };
-
-  const [total, items] = await Promise.all([
-    prisma.report.count({ where }),
-    prisma.report.findMany({
-      where,
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-      orderBy: { createdAt: 'desc' },
-    }),
-  ]);
-
-  response.json({
-    items,
-    pagination: buildPagination(page, pageSize, total),
-  });
-});
-
-adminRouter.get('/reports/:id', async (request, response) => {
-  const report = await prisma.report.findUnique({
-    where: { id: request.params.id },
-  });
-
-  if (!report) {
-    response.status(404).json({ message: 'Report not found' });
-    return;
-  }
-
-  response.json({ report });
-});
-
-adminRouter.post('/reports', async (request, response) => {
-  const parsed = reportCreateSchema.safeParse(request.body);
-  if (!parsed.success) {
-    response.status(400).json({ message: 'Invalid payload', errors: parsed.error.flatten() });
-    return;
-  }
-
-  const { targetType, targetId, reason } = parsed.data;
-  const reporterId = request.user?.sub;
-
-  if (!reporterId) {
-    response.status(401).json({ message: 'Unauthorized' });
-    return;
-  }
-
-  const report = await prisma.report.create({
-    data: {
-      reporterId,
-      targetType,
-      targetId,
-      reason,
-    },
-  });
-
-  response.status(201).json({ report });
-});
-
-adminRouter.patch('/reports/:id', async (request, response) => {
-  const parsed = reportUpdateSchema.safeParse(request.body);
-  if (!parsed.success) {
-    response.status(400).json({ message: 'Invalid payload', errors: parsed.error.flatten() });
-    return;
-  }
-
-  const { status, resolution } = parsed.data;
-  const adminId = request.user?.sub;
-
-  const report = await prisma.report.update({
-    where: { id: request.params.id },
-    data: {
-      status,
-      ...(resolution !== undefined ? { resolution } : {}),
-      ...(status === 'RESOLVED' || status === 'DISMISSED'
-        ? { resolvedBy: adminId, resolvedAt: new Date() }
-        : {}),
-    },
-  });
-
-  response.json({ report });
 });

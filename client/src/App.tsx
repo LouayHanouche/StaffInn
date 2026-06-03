@@ -7,31 +7,34 @@ import { RegisterPage } from './pages/RegisterPage';
 import { LandingPage } from './pages/LandingPage';
 
 const CandidateDashboard = lazy(() =>
-  import('./pages/CandidateDashboard').then((module) => ({ default: module.CandidateDashboard }))
+  import('./pages/CandidateDashboard').then((module) => ({ default: module.CandidateDashboard })),
 );
 const CandidateProfile = lazy(() =>
-  import('./pages/CandidateProfile').then((module) => ({ default: module.CandidateProfile }))
+  import('./pages/CandidateProfile').then((module) => ({ default: module.CandidateProfile })),
 );
 const CandidateApplications = lazy(() =>
-  import('./pages/CandidateApplications').then((module) => ({ default: module.CandidateApplications }))
+  import('./pages/CandidateApplications').then((module) => ({
+    default: module.CandidateApplications,
+  })),
 );
 const CandidateRecruitments = lazy(() =>
-  import('./pages/CandidateRecruitments').then((module) => ({ default: module.CandidateRecruitments }))
+  import('./pages/CandidateRecruitments').then((module) => ({
+    default: module.CandidateRecruitments,
+  })),
 );
 const CandidateOfferSearch = lazy(() =>
-  import('./pages/CandidateOfferSearch').then((module) => ({ default: module.CandidateOfferSearch }))
+  import('./pages/CandidateOfferSearch').then((module) => ({
+    default: module.CandidateOfferSearch,
+  })),
 );
 const HotelDashboard = lazy(() =>
-  import('./pages/HotelDashboard').then((module) => ({ default: module.HotelDashboard }))
+  import('./pages/HotelDashboard').then((module) => ({ default: module.HotelDashboard })),
 );
 const CVDatabase = lazy(() =>
-  import('./pages/CVDatabase').then((module) => ({ default: module.CVDatabase }))
+  import('./pages/CVDatabase').then((module) => ({ default: module.CVDatabase })),
 );
 const AdminPanel = lazy(() =>
-  import('./pages/AdminPanel').then((module) => ({ default: module.AdminPanel }))
-);
-const AdminReportsPage = lazy(() =>
-  import('./pages/AdminReportsPage').then((module) => ({ default: module.AdminReportsPage }))
+  import('./pages/AdminPanel').then((module) => ({ default: module.AdminPanel })),
 );
 
 const HomeRedirect = () => {
@@ -134,14 +137,6 @@ export const App = (): JSX.Element => {
             element={
               <ProtectedRoute allowedRoles={['ADMIN']}>
                 <AdminPanel />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/reports"
-            element={
-              <ProtectedRoute allowedRoles={['ADMIN']}>
-                <AdminReportsPage />
               </ProtectedRoute>
             }
           />

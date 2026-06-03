@@ -20,10 +20,7 @@ export const Sidebar = (): JSX.Element => {
     { path: '/cv-database', icon: '👥', label: 'Candidats' },
   ];
 
-  const adminLinks = [
-    { path: '/admin', icon: '🏠', label: 'Administration' },
-    { path: '/admin/reports', icon: '📋', label: 'Signalements' },
-  ];
+  const adminLinks = [{ path: '/admin', icon: '🏠', label: 'Administration' }];
 
   const links =
     user?.role === 'ADMIN' ? adminLinks : user?.role === 'HOTEL' ? hotelLinks : candidateLinks;
